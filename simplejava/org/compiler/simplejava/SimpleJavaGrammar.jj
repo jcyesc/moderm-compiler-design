@@ -1,0 +1,855 @@
+/**
+ * Grammar for SimpleJava.
+ *
+ * @author jcyescas
+ */options{  JDK_VERSION = "1.6";  static = false;}PARSER_BEGIN(SimpleJava)package org.compiler.simplejava;
+
+import java.util.ArrayList;
+import java.util.List;
+import org.compiler.simplejava.ast.*;
+
+public class SimpleJava{}PARSER_END(SimpleJava)
+
+TOKEN_MGR_DECLS :
+{  public static int numInnerComments = 0; 
+}SKIP :{  " "| "\r"| "\t"| "\n"}
+SKIP :
+{
+  < "//" (~["\n"])* "\n" >
+| <  "/*" > : OUTER_COMMENT
+}
+
+<OUTER_COMMENT>
+SKIP :
+{
+  < "/*" > { numInnerComments++; SwitchTo(INNER_COMMENT); }
+| < "*/" > { SwitchTo(DEFAULT); }
+| < ~[] >
+}
+
+/* This language accepts NESTED COMMENS. */
+<INNER_COMMENT>
+SKIP:
+{
+  <  "*/" > {
+    numInnerComments--;
+    if (numInnerComments == 0) {
+      SwitchTo(OUTER_COMMENT);
+    }
+  }
+|  < "/*" > { numInnerComments++; }
+|  <  ~[] >
+}
+
+
+TOKEN : /* Reserved Words */
+{
+  < CLASS : "class" >
+|  < DO : "do" > 
+|  < IF : "if" >
+|  < ELSE : "else" >
+|  < FALSE : "false" >
+|  < FOR : "for" >
+|  < RETURN: "return">
+|  < TRUE : "true" >
+|  < WHILE : "while" >
+|  < NEW : "new" >
+}
+TOKEN : /* OPERATORS */{
+/* Arithmetic operators*/  < PLUS : "+" >|  < MINUS : "-" >|  < MULTIPLY : "*" >|  < DIVIDE : "/" >
+
+/* Increment operators*/
+|  < INCREMENT : "++" >
+|  < DECREMENT : "--" >
+
+/* Brackets, braces and parenthesis */
+|  < LEFT_BRACKET : "[" >
+|  < RIGHT_BRACKET : "]" >
+|  < LEFT_BRACE : "{" >
+|  < RIGHT_BRACE : "}" >
+|  < LEFT_PARENTHESIS : "(" >
+|  < RIGHT_PARENTHESIS : ")" >
+
+/* Access operator */
+|  < DOT : "." >
+
+/* Statement operators */
+|  < COMMA : "," >
+|  < SEMICOLON : ";" >
+
+/* Equality operators */
+|  < EQUAL : "==" >
+|  < NOT_EQUAL : "!=" >
+
+/* Comparison operators */
+|  < LESS_THAN : "<" >
+|  < GREATER_THAN : ">" >
+|  < LESS_THAN_OR_EQUAL : "<=" >
+|  < GREATER_THAN_OR_EQUAL : ">=" >
+
+/* Assignment operators */
+|  < GETS : "=" >
+
+/* Logical operators */
+|  < AND : "&&" >
+|  < OR : "||" >
+|  < NOT : "!" >
+
+/* Identifiers */
+|  < INTEGER_LITERAL : (["0"-"9"])+ >
+|  < IDENTIFIER: ["A"-"Z", "a"-"z", "_"](["A"-"Z", "a"-"z", "0"-"9", "_"])* >}
+AstProgram program():
+{
+  AstClasses astClasses;
+  AstFunctionDefinitions astFunctionDefinitions;
+  
+}
+{
+  astClasses = classDefinitions() astFunctionDefinitions = functionDefinitions() <EOF> /* Make sure this is the end of the file. */
+
+  { return new AstProgram(astClasses, astFunctionDefinitions, 1); }
+}
+
+AstClasses classDefinitions():
+{
+  AstClasses astClasses = new AstClasses();
+  AstClass astClass;
+}
+{  ( astClass = classDefinition() { astClasses.addAstClass(astClass); } )*
+
+  { return astClasses; }  
+}
+
+AstClass classDefinition():
+{
+  Token classNameToken;
+  Token functionDefTypeToken;
+  Token firstIdentifier;
+  Token secondIdentifier;
+  AstInstanceVariableDefs astInstanceVariableDefs = new AstInstanceVariableDefs();
+  AstFunctionDefinitions astMethodDefinitions = new AstFunctionDefinitions();
+  AstFunction astConstructor = null;
+  AstStatements astStatements = null;
+  AstFormals astFormals;
+  int arrayDimension = 0;
+  AstFunction constructor = null;
+}
+{  <CLASS> classNameToken = <IDENTIFIER>
+  <LEFT_BRACE>
+    (
+      firstIdentifier = <IDENTIFIER>
+      (
+        (
+          // Rules for Variable definitions, methods and prototypes.
+	      secondIdentifier = <IDENTIFIER>
+	      (
+	        // Variable definition        
+	        (<LEFT_BRACKET> <RIGHT_BRACKET> { arrayDimension++; } )* <SEMICOLON>
+	        {
+	          AstInstanceVariableDef astInstanceVariableDef = new AstInstanceVariableDef(firstIdentifier.image, secondIdentifier.image, arrayDimension, firstIdentifier.beginLine);
+	          astInstanceVariableDefs.addAstInstanceVariableDef(astInstanceVariableDef);
+	          arrayDimension = 0;
+	        }  
+	        |
+	        <LEFT_PARENTHESIS> astFormals = formalParameterList() <RIGHT_PARENTHESIS>
+	        (
+	          functionDefTypeToken = <SEMICOLON>
+	          | functionDefTypeToken = <LEFT_BRACE> astStatements = statementList() <RIGHT_BRACE>
+	        )
+	        {
+	          if (functionDefTypeToken.kind == SEMICOLON) {
+	            // Adding the function prototype.
+	            AstPrototype astPrototype = new AstPrototype(firstIdentifier.image, secondIdentifier.image, astFormals, FunctionType.METHOD, firstIdentifier.beginLine);
+	            astMethodDefinitions.addAstFunctionDefinition(astPrototype);
+	          } else {
+	            // Adding the function.
+	            AstFunction astFunction = new AstFunction(firstIdentifier.image, secondIdentifier.image, astFormals, astStatements, FunctionType.METHOD, firstIdentifier.beginLine);
+	            astMethodDefinitions.addAstFunctionDefinition(astFunction);
+	          }
+	        } 	      )
+	    )
+	    |
+	    // Rule for constructor definition.
+	    <LEFT_PARENTHESIS> astFormals = formalParameterList() <RIGHT_PARENTHESIS>
+	    functionDefTypeToken = <LEFT_BRACE> astStatements = statementList() <RIGHT_BRACE>
+	    {
+	      // Adding the constructor (The return type and the name are the same for the constructors).
+          astConstructor = new AstFunction(firstIdentifier.image, firstIdentifier.image, astFormals, astStatements, FunctionType.CONSTRUCTOR, firstIdentifier.beginLine);
+        }
+	  )
+    )*
+  <RIGHT_BRACE>
+
+  { return new AstClass(classNameToken.image, astInstanceVariableDefs, astConstructor, astMethodDefinitions, classNameToken.beginLine); }
+}
+
+AstInstanceVariableDefs variableDefinitions():
+{
+  AstInstanceVariableDefs astInstanceVariableDefs = new AstInstanceVariableDefs();
+  AstInstanceVariableDef astInstanceVariableDef;
+}
+{
+  (
+    astInstanceVariableDef = variableDefinition() <SEMICOLON>    { astInstanceVariableDefs.addAstInstanceVariableDef(astInstanceVariableDef); }
+  )*
+
+  { return astInstanceVariableDefs;}}
+
+AstInstanceVariableDef variableDefinition():
+{
+  Token typeToken;
+  Token nameToken;
+  int arrayDimension = 0;
+}
+{  typeToken = <IDENTIFIER> nameToken = <IDENTIFIER>
+    (<LEFT_BRACKET> <RIGHT_BRACKET> { arrayDimension++; } )*
+
+  { return new AstInstanceVariableDef(typeToken.image, nameToken.image, arrayDimension, typeToken.beginLine); }
+}
+
+AstFunctionDefinitions functionDefinitions():
+{
+  AstFunctionDefinitions astFunctionDefinitions = new AstFunctionDefinitions();
+  AstFunctionDefinition astFunctionDefinition;
+  AstStatements astStatements = null;
+  AstFormals astFormals;
+  Token returnToken;
+  Token nameToken;
+  Token functionDefTypeToken;
+}
+{
+  (
+    returnToken = <IDENTIFIER> nameToken = <IDENTIFIER>
+    <LEFT_PARENTHESIS> astFormals = formalParameterList() <RIGHT_PARENTHESIS>
+    (
+      functionDefTypeToken = <SEMICOLON>
+      | functionDefTypeToken = <LEFT_BRACE> astStatements = statementList() <RIGHT_BRACE>
+    )
+
+    {
+      if (functionDefTypeToken.kind == SEMICOLON) {
+        // Adding the function prototype.
+        AstPrototype astPrototype = new AstPrototype(returnToken.image, nameToken.image, astFormals, returnToken.beginLine);        astFunctionDefinitions.addAstFunctionDefinition(astPrototype);
+      } else {
+        // Adding the function.
+        AstFunction astFunction = new AstFunction(returnToken.image, nameToken.image, astFormals, astStatements, returnToken.beginLine);
+        astFunctionDefinitions.addAstFunctionDefinition(astFunction);      }    }
+  )*
+
+  { return astFunctionDefinitions; }
+}
+
+AstFormals formalParameterList():
+{
+  AstFormals astFormals = new AstFormals();
+  AstFormal astFormal;
+}
+{
+  astFormal = formalParameter() { astFormals.addAstFormal(astFormal); }
+  ( <COMMA> astFormal = formalParameter() { astFormals.addAstFormal(astFormal); } )*
+
+  { return astFormals; }
+|
+  { return astFormals; }
+}
+
+AstFormal formalParameter():
+{
+  Token typeToken;
+  Token nameToken;
+  int arrayDimension = 0;}
+{
+  typeToken = <IDENTIFIER> nameToken = <IDENTIFIER>
+  (<LEFT_BRACKET> <RIGHT_BRACKET> { arrayDimension++; } )*
+  { return new AstFormal(typeToken.image, nameToken.image, arrayDimension, typeToken.beginLine); }}
+
+AstStatements statementList():
+{
+  AstStatements astStatements = new AstStatements();
+  AstStatement astStatement;
+}
+{
+  (
+    astStatement = statement()    { astStatements.addAstStatement(astStatement); }
+  )*
+
+  { return astStatements; }
+}
+
+AstStatement statement():
+{
+  AstStatement stmt;
+  Token semicolonToken;
+}
+{
+  (
+	 stmt = blockStatement()
+	| stmt = ifStatement()
+	| stmt = doWhileStatement()
+	| stmt = whileStatement()
+	| stmt = forStatement()
+	| stmt = returnStatement()
+	| stmt = variableOrFunctionStatement()
+	| semicolonToken = <SEMICOLON> { stmt = new AstEmptyStatement(semicolonToken.beginLine); }
+  )
+  { return stmt; }}
+
+AstStatement blockStatement():
+{
+  AstStatements astStatements = new AstStatements();
+}
+{  <LEFT_BRACE> astStatements = statementList() <RIGHT_BRACE>
+
+  { return astStatements; }
+}
+
+AstStatement doWhileStatement():
+{
+  AstStatement stmt;
+  AstExpression expr;
+  Token doToken;
+}
+{
+  // The semicolon is not required at the end of the right paranthesis.
+  doToken = <DO> stmt = statement() <WHILE> <LEFT_PARENTHESIS> expr = expression() <RIGHT_PARENTHESIS> /* <SEMICOLON> */
+
+  { return new AstDoWhileStatement(expr, stmt, doToken.beginLine); }
+}
+
+AstStatement whileStatement():
+{
+  AstStatement stmt;
+  AstExpression expr;
+  Token whileToken;
+}
+{
+  whileToken = <WHILE> <LEFT_PARENTHESIS> expr = expression() <RIGHT_PARENTHESIS> stmt = statement()
+
+  { return new AstWhileStatement(expr, stmt, whileToken.beginLine); }
+}
+
+AstStatement forStatement():
+{
+  AstStatement initStmt = null;
+  AstExpression testExpr = null;
+  AstStatement incrementStmt = null;
+  AstStatement bodyStmt;
+  AstBaseVariable baseVariable;
+  Token forToken;
+  Token nameToken;
+}
+{  forToken = <FOR>
+     <LEFT_PARENTHESIS>
+	     ( initStmt = forInitialization() )? <SEMICOLON>
+	     ( testExpr = expression() )? <SEMICOLON>
+	     (
+	       nameToken = <IDENTIFIER> { baseVariable = new AstBaseVariable(nameToken.image, nameToken.beginLine); }
+           incrementStmt = assignments(baseVariable)
+
+         )?
+     <RIGHT_PARENTHESIS> bodyStmt = statement()
+
+  {
+    if (initStmt == null) {      initStmt = new AstEmptyStatement(forToken.beginLine);
+    }
+
+    if (testExpr == null) {
+      testExpr = new AstBooleanLiteral(true, forToken.beginLine);    }
+
+    if (incrementStmt == null) {
+      incrementStmt = new AstEmptyStatement(forToken.beginLine);
+    }
+
+    return new AstForStatement(initStmt, testExpr, incrementStmt, bodyStmt, forToken.beginLine);  }
+}
+
+AstStatement forInitialization():
+{
+  AstStatement stmt;
+  AstBaseVariable baseVariable;
+  Token nameToken;
+}
+{
+  nameToken = <IDENTIFIER>
+    (
+      // Passing the type
+      stmt = declarations(nameToken.image)
+      |
+        {
+          // Creating the base variable for the assigment.
+          baseVariable = new AstBaseVariable(nameToken.image, nameToken.beginLine);
+        }
+        // Passing the base variable
+        stmt = assignments(baseVariable)
+    )
+
+  { return stmt; }
+}
+
+AstStatement assignments(AstVariable baseVariable):
+{
+ AstStatements stmts = new AstStatements();
+ AstStatement stmt = null;
+ Token nameToken;
+}
+{
+  baseVariable = leftVariable(baseVariable)
+  stmt = assignment(baseVariable)
+    (
+      { stmts.addAstStatement(stmt); }
+
+      <COMMA> nameToken = <IDENTIFIER>
+        {
+          // Creating the base variable for the assigment.
+          baseVariable = new AstBaseVariable(nameToken.image, nameToken.beginLine);
+        }
+        baseVariable = leftVariable(baseVariable)
+        stmt = assignment(baseVariable) { stmts.addAstStatement(stmt); }
+    )*
+
+  {
+    if (stmts.getSize() > 0) {
+      return stmts;
+    }
+
+    return stmt;
+  }
+}
+
+// Returns assignment statements like a = 43 + 9
+AstStatement assignment(AstVariable baseVariable):
+{
+  AstExpression expr = null;
+  Token nameToken;
+  Token incrementToken = null;
+}
+{
+  (
+    <GETS> expr = expression()
+    | incrementToken = <INCREMENT>
+    | incrementToken = <DECREMENT>
+  )
+
+  {
+    if (expr == null) {
+      // The increment and decrement operators will be treated like a++ equals to a = a + 1
+      int beginLine = incrementToken.beginLine;
+      expr = new AstVariableExpression(baseVariable, beginLine);
+      AstIntegerLiteral one = new AstIntegerLiteral(1, beginLine);      if (incrementToken.kind == INCREMENT) {
+        expr = new AstOperatorExpression(expr, one, AstOperatorExpression.PLUS, beginLine);
+      } else {
+        expr = new AstOperatorExpression(expr, one, AstOperatorExpression.MINUS, beginLine);      }
+    }
+
+    return new AstAssignmentStatement(baseVariable, expr, baseVariable.getLine());
+  }
+}
+
+AstVariable leftVariable(AstVariable baseVariable):
+{
+  AstExpression arrayAccess;
+  List<AstExpression> arguments = null;
+  Token nameToken;
+}
+{
+  // (arrayAccess())* (<DOT> <IDENTIFIER> (arrayAccess())*)*
+  (
+    // Represents the derivations ( a[3][43][4] )
+    arrayAccess = arrayAccess()
+    {
+      // Represents Array variable.
+      baseVariable = new AstArrayVariable(baseVariable, arrayAccess, baseVariable.getLine());
+    }
+  )*
+  (
+    // Represents the derivations ( base.a.b.[4].x.[3].a )
+    <DOT> nameToken = <IDENTIFIER>
+    (      // Represents the derivations ( base.a.b.[4].x.[3].myfunction() )
+      <LEFT_PARENTHESIS> ( arguments = arguments() )? <RIGHT_PARENTHESIS>
+      {
+        // Creating the method expression with its arguments.
+        AstMethodVariable methodVariable = new AstMethodVariable(baseVariable, nameToken.image, nameToken.beginLine);
+        if (arguments != null) {
+          methodVariable.setExpressions(arguments);
+        }
+
+        baseVariable = methodVariable;
+      }
+
+      | 
+      // Represents the derivations ( base.a.b.[4].x.[3].a )
+	  {
+	    // Represents Class variable
+	    baseVariable = new AstClassVariable(baseVariable, nameToken.image, nameToken.beginLine);
+	  }
+	  (
+	      // Represents Array variable.
+	      arrayAccess = arrayAccess()
+	      {
+	        baseVariable = new AstArrayVariable(baseVariable, arrayAccess, nameToken.beginLine);
+	      }
+	    )*
+    )
+  )*
+
+  { return baseVariable;}
+}
+
+AstStatement declarations(String type):
+{
+ AstStatements stmts = new AstStatements();
+ AstStatement stmt;
+}
+{
+  stmt = declaration(type)
+  (  { stmts.addAstStatement(stmt); } <COMMA> stmt = declaration(type) { stmts.addAstStatement(stmt); } )*
+
+  {
+    if (stmts.getSize() > 0)
+      return stmts;
+
+    return stmt;
+  }
+}
+
+AstStatement declaration(String type):
+{
+  AstExpression expr = null;
+  Token nameToken;
+  int arrayDimension = 0;
+}
+{
+  nameToken = <IDENTIFIER> ( <LEFT_BRACKET> <RIGHT_BRACKET> { arrayDimension++; } )* ( <GETS> expr = expression() )?
+
+  { return new AstVariableDefStatement(type, nameToken.image, arrayDimension, expr, nameToken.beginLine); }
+}
+
+AstStatement variableOrFunctionStatement():
+{
+  AstStatement stmt = null;
+  AstVariable baseVariable;
+  Token nameToken;
+  List<AstExpression> arguments = null;
+}
+{
+  nameToken = <IDENTIFIER>
+    (
+        // Passing the type (DECLARATIONS)
+        stmt = declarations(nameToken.image) <SEMICOLON>
+      |
+        // ASSIGNMENTS OR METHOD CALL        {
+          // Creating the base variable for the assigment.
+          baseVariable = new AstBaseVariable(nameToken.image, nameToken.beginLine);        }
+
+        baseVariable = leftVariable(baseVariable)
+
+        (stmt = assignment(baseVariable))? <SEMICOLON>
+		{
+		  if (stmt == null) {		    if (baseVariable instanceof AstMethodVariable) {
+		      stmt = new AstMethodCallStatement((AstMethodVariable) baseVariable, nameToken.beginLine);
+		    } else {
+		      // variable.x.y.a; is an invalid statement.
+		      throw new ParseException("This is not a valid statement! " + nameToken.beginLine);
+		    }		  }		}
+      |
+        // FUNCTION CALL
+        <LEFT_PARENTHESIS> ( arguments = arguments() )? <RIGHT_PARENTHESIS> <SEMICOLON>
+        {
+          AstFunctionCallStatement functionStmt = new AstFunctionCallStatement(nameToken.image, nameToken.beginLine);
+          if (arguments != null) {
+            for (AstExpression arg : arguments)
+              functionStmt.addAstExpression(arg);
+          }
+
+          stmt = functionStmt;        }
+    )
+
+    { return stmt; }
+}
+
+AstStatement ifStatement():
+{
+  AstStatement ifStmt;
+  AstStatement elseStmt = null;
+  AstExpression testExpre;
+  Token ifToken;
+}
+{  ifToken = <IF> <LEFT_PARENTHESIS> testExpre = expression() <RIGHT_PARENTHESIS>
+  ifStmt = statement()
+  (LOOKAHEAD(1) <ELSE> elseStmt = statement() )?
+
+  { return new AstIfStatement(testExpre, ifStmt, elseStmt, ifToken.beginLine); }
+}
+
+AstStatement returnStatement():
+{
+  AstExpression expr = null;
+  Token returnToken;
+}
+{
+  returnToken = <RETURN> ( expr = expression() )? <SEMICOLON>
+
+  {
+    return new AstReturnStatement(expr, returnToken.beginLine);
+  }}
+
+List<AstExpression> arguments():
+{
+  List<AstExpression> expressions = new ArrayList<AstExpression>();
+  AstExpression expr;
+}
+{
+  expr = expression() { expressions.add(expr); } ( <COMMA> expr = expression() { expressions.add(expr); } )*
+
+  { return expressions; }  }
+
+AstExpression expression():
+{
+  AstExpression expression;
+}
+{
+  ( expression = operatorExpression() | expression = newExpression() )
+
+  { return expression; } 
+}
+
+AstExpression operatorExpression():
+{
+  AstExpression leftExpr = null;
+  AstExpression rightExpr = null;
+  Token operatorToken;
+}
+{
+   leftExpr = logicalOrTerm()
+   (
+     operatorToken = <OR> rightExpr = logicalOrTerm()
+     { leftExpr = new AstOperatorExpression(leftExpr, rightExpr, operatorToken.image, operatorToken.beginLine); }
+   )*
+
+   { return leftExpr; }}
+
+AstExpression logicalOrTerm():
+{
+  AstExpression leftExpr = null;
+  AstExpression rightExpr = null;
+  Token operatorToken;
+}
+{
+  leftExpr = logicalAndTerm()
+  (
+    operatorToken = <AND> rightExpr = logicalAndTerm()
+    { leftExpr = new AstOperatorExpression(leftExpr, rightExpr, operatorToken.image, operatorToken.beginLine); }
+  )*
+
+  { return leftExpr; }
+}
+
+AstExpression logicalAndTerm():
+{
+  AstExpression leftExpr = null;
+  AstExpression rightExpr = null;
+  Token operatorToken;
+}
+{
+  (    leftExpr = comparativeTerm()
+      (
+        ( operatorToken = <EQUAL>
+          | operatorToken = <NOT_EQUAL>
+          | operatorToken = <LESS_THAN>
+          | operatorToken = <LESS_THAN_OR_EQUAL>
+          | operatorToken = <GREATER_THAN>
+          | operatorToken = <GREATER_THAN_OR_EQUAL>
+        )
+        rightExpr = comparativeTerm()
+        { leftExpr = new AstOperatorExpression(leftExpr, rightExpr, operatorToken.image, operatorToken.beginLine); }
+      )?
+    | leftExpr = negativeExpression()
+  )
+
+  { return leftExpr; }
+}
+
+AstExpression comparativeTerm():
+{
+  AstExpression leftExpr = null;
+  AstExpression rightExpr = null;
+  Token operatorToken;
+}
+{
+  leftExpr = term()
+  (
+    ( operatorToken = <MINUS> | operatorToken = <PLUS> )  rightExpr = term()
+    { leftExpr = new AstOperatorExpression(leftExpr, rightExpr, operatorToken.image, operatorToken.beginLine); }
+  )*
+
+  { return leftExpr; }
+}
+
+AstExpression negativeExpression():
+{
+  Token negativeToken;
+  int countUnaries = 0;
+  AstExpression expression;
+}
+{
+   /* There can be many negations before the expression. */  ( negativeToken = <NOT> { countUnaries++; } )+  expression = factor()
+
+  {
+    for (int i = 0; i < countUnaries; i++) {        expression = new AstUnaryOperatorExpression(expression, negativeToken.image, negativeToken.beginLine);
+    }      }
+  { return expression; }
+}
+AstExpression term():
+{
+  AstExpression leftExpr = null;
+  AstExpression rightExpr = null;
+  Token operatorToken;
+}
+{
+  leftExpr = factor()
+    (
+       ( operatorToken = <MULTIPLY> | operatorToken = <DIVIDE> ) rightExpr = factor()
+      { leftExpr = new AstOperatorExpression(leftExpr, rightExpr, operatorToken.image, operatorToken.beginLine); }
+    )*
+
+  { return leftExpr; }}
+
+AstExpression factor():
+{
+  AstExpression expression;
+  Token factorToken;
+  Token minusToken = null;
+}
+{  (    ( minusToken = <MINUS>)?
+      (
+        expression = complexAccess()
+        | factorToken = <INTEGER_LITERAL>
+          { expression = new AstIntegerLiteral(Integer.parseInt(factorToken.image), factorToken.beginLine); }
+        | <LEFT_PARENTHESIS> expression = expression() <RIGHT_PARENTHESIS>
+      )
+    |  factorToken = <TRUE> { expression = new AstBooleanLiteral(true, factorToken.beginLine); }
+    |  factorToken = <FALSE> { expression = new AstBooleanLiteral(false, factorToken.beginLine); }
+  )
+
+  {
+    if (minusToken != null) {
+      /* -45 ==  0 - 45*/      return new AstOperatorExpression(new AstIntegerLiteral(0, minusToken.beginLine), expression, minusToken.image, minusToken.beginLine);
+    } else {      return expression;
+    }
+  }
+}
+
+AstExpression complexAccess():
+{
+  AstExpression expr;
+  AstExpression arrayAccess;
+  List<AstExpression> arguments = null;
+  AstVariable baseVariable;
+  AstArrayVariable arrayVariable;
+  AstClassVariable classVariable;
+  Token nameToken;
+}
+{
+  nameToken = <IDENTIFIER>
+    (
+      // Function call
+      <LEFT_PARENTHESIS> ( arguments = arguments() )? <RIGHT_PARENTHESIS>
+        {
+          // Creating the function expression with its arguments.
+          AstFunctionCallExpression functionExpr =
+              new AstFunctionCallExpression(nameToken.image, nameToken.beginLine);
+          if (arguments != null) {
+            for (AstExpression arg : arguments)              functionExpr.addAstExpression(arg);
+          }
+
+          expr = functionExpr;
+        }
+      |
+        {
+          // Defining the base variable (x)
+          baseVariable = new AstBaseVariable(nameToken.image, nameToken.beginLine);
+          expr = new AstVariableExpression(baseVariable, nameToken.beginLine);
+        }
+        (
+          // Represents the derivations ( a[3][43][4] )
+          arrayAccess = arrayAccess()
+          {
+            arrayVariable = new AstArrayVariable(baseVariable, arrayAccess, nameToken.beginLine);
+            expr = new AstVariableExpression(arrayVariable, nameToken.beginLine);
+            baseVariable = arrayVariable;
+          }
+        )*
+        ( 
+          <DOT> nameToken = <IDENTIFIER>
+          (
+               // Represents the derivations ( base.a.b.[4].x.[3].myfunction() )
+               <LEFT_PARENTHESIS> ( arguments = arguments() )? <RIGHT_PARENTHESIS>
+               {
+                  // Creating the method expression with its arguments.
+                  AstMethodVariable methodVariable =
+                      new AstMethodVariable(baseVariable, nameToken.image, nameToken.beginLine);
+                  if (arguments != null) {
+                    for (AstExpression arg : arguments)
+                      methodVariable.addAstExpression(arg);
+                  }
+
+                  expr = new AstMethodCallExpression(methodVariable, nameToken.beginLine);
+                  baseVariable = methodVariable;
+                }
+              | 
+              // Represents the derivations ( base.a.b.[4].x.[3].a )
+              {
+                classVariable = new AstClassVariable(baseVariable, nameToken.image, nameToken.beginLine);
+                expr = new AstVariableExpression(classVariable, nameToken.beginLine);
+                baseVariable = classVariable;
+              }
+	          (
+	            arrayAccess = arrayAccess()
+	            {
+	              arrayVariable = new AstArrayVariable(baseVariable, arrayAccess, nameToken.beginLine);
+	              expr = new AstVariableExpression(arrayVariable, nameToken.beginLine);
+	              baseVariable = arrayVariable;
+	            }
+	          )*
+          )     
+        )*
+    )
+
+  { return expr; }
+}
+
+AstExpression arrayAccess():
+{
+  AstExpression expression;
+}
+{  <LEFT_BRACKET> expression = expression() <RIGHT_BRACKET>
+
+  { return expression; }
+}
+
+AstExpression newExpression():
+{
+  AstExpression expression;
+  AstExpression arrayAccess;
+  List<AstExpression> arguments = null;
+  int arrayDimension = 1;   // It is already of one dimension.
+  Token tokenType;
+  Token tokenNew;
+}
+{  tokenNew = <NEW> tokenType = <IDENTIFIER>
+    (
+      <LEFT_PARENTHESIS> ( arguments = arguments() )? <RIGHT_PARENTHESIS>
+        {
+          AstNewClassExpression newClass = new AstNewClassExpression(tokenType.image, tokenNew.beginLine);
+          if (arguments != null) {
+            newClass.setExpressions(arguments);
+          }
+
+          expression = newClass;
+        }
+      | arrayAccess = arrayAccess()  ( <LEFT_BRACKET> <RIGHT_BRACKET> { arrayDimension++; } )*
+        { expression = new AstNewArrayExpression(tokenType.image, arrayAccess, arrayDimension, tokenNew.beginLine); }
+    )
+
+  { return expression; }
+}

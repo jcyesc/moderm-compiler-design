@@ -1,0 +1,123 @@
+Grammar for SimpleLogic:
+
+==================
+Terminal simbols
+==================
+
+for if while do else class true false return
+
+
+====================
+Questions
+====================
+
+Can a program be an empty file? how many classes or functions a program must have?
+Yes, a valid program can be an empty file
+
+
+Can our function return arrays? No
+
+Does simpleJava allow constructors with parameters?
+
+Does simpleJava allow to initialize the arrays with expressions between the brackets?
+
+Should simpleJava support preincrement and posincrement (predecrement and posdecrement)
+
+In the initialization part of the for loop, how the variable declaration works?
+
+for (int a = 0, b =9; ; )
+
+why a function that returns a value can't be an statement?
+
+Can javacc print the grammar? 
+
+====================
+Grammar definition
+====================
+
+program -> classDefinitions functionDefinitions
+
+classDefinitions -> (classDefinition)*
+
+classDefinition -> class identifier { variableDefinitions }
+
+variableDefinitions -> ( variableDefinition; )*
+
+variableDefinition -> identifier identifier ([])*
+
+functionDefinitions -> (identifier identifier ( formalParameterList ) functionDefinition)*
+
+functionDefinition ->  ; | { statementList }
+
+formalParameterList -> variableDefinition (, variableDefinition)*
+
+statementList -> (statement)*
+
+statement->  blockStatement | variableOrFunctionStatement | ifStatement |
+      doWhileStatement | whileStatement | forStatement | ; | returnStatement
+
+blockStatement-> { statementList }
+
+variableOrFunctionStatement-> complexLeftAccess (declarations | assignment | functionArguments) ;
+
+complexLeftAccess-> identifier (arrayAccess)* ( . identifier (arrayAccess)* )*)
+
+functionArguments-> "("  (arguments)? ")"
+
+declarations-> declaration (, declaration)*
+
+declaration-> identifier ([])* (= expression)?
+
+assignments-> assignment (, identifier assignment)*
+
+assignment-> (= expression | ++ | -- )
+
+doWhileStatements-> do statement while (expression);
+
+whileStatement-> while (expression) statement
+
+forStatement-> for ( forInitialization? ; (expression)? ; (identifier assignments)? ) statement
+
+forInitialization-> identifier (declarations | assignments ) 
+
+ifStatement-> if ( expression() ) statement() (else statement())?
+
+arguments-> expression (, expression)*
+
+returnStatement-> return (expression)? ;
+
+expression-> operatorExpression | newExpression
+
+operatorExpression-> logicalOrTerm logicalOrExpression
+
+logicalOrExpression-> (||) logicalOrTerm logicalOrExpression | EPSILON
+
+logicalOrTerm-> logicalAndTerm logicalAndExpression
+
+logicalAndExpression-> (&&) logicalAndTerm logicalAndExpression | EPSILON
+
+logicalAndTerm-> negativeExpression | comparativeTerm comparisonExpression
+
+negativeExpression-> (!)+ factor
+
+comparisonExpression-> (== | != | < | <= | > | >=) comparativeTerm | EPSILON
+
+comparativeTerm-> term arithmeticExpression
+
+arithmeticExpression-> (+ | -) term arithmeticExpression | EPSILON  
+
+term-> factor arithmeticFactor
+
+arithmeticFactor-> (* | /) factor arithmeticFactor | EPSILON
+
+factor-> (-)?  ( complexAccess | integer )  | true | false | (expression)
+
+complexAccess-> identifier (functionArguments | (arrayAccess)* ( . identifier (arrayAccess)* )*)
+
+arrayAccess-> "[" expression "]"
+
+identifier: [a-z][a-z0-9]*
+
+newExpression-> new identifier ( "(" ")" | [ expression ] ([])*
+
+

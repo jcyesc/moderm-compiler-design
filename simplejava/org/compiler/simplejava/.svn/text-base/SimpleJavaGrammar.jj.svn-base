@@ -1,0 +1,441 @@
+/**
+ * Grammar for SimpleJava.
+ *
+ * @author jcyescas and mchally
+ */options{  JDK_VERSION = "1.6";  static = false;}PARSER_BEGIN(SimpleJava)package org.compiler.simplejava;
+
+public class SimpleJava{}PARSER_END(SimpleJava)
+
+TOKEN_MGR_DECLS :
+{  public static int numInnerComments = 0; 
+}SKIP :{  " "| "\r"| "\t"| "\n"}
+SKIP :
+{
+  < "//" (~["\n"])* "\n" >
+| <  "/*" > : OUTER_COMMENT
+}
+
+<OUTER_COMMENT>
+SKIP :
+{
+  < "/*" > { numInnerComments++; SwitchTo(INNER_COMMENT); }
+| < "*/" > { SwitchTo(DEFAULT); }
+| < ~[] >
+}
+
+/* This language accepts NESTED COMMENS. */
+<INNER_COMMENT>
+SKIP:
+{
+  <  "*/" > {
+    numInnerComments--;
+    if (numInnerComments == 0) {
+      SwitchTo(OUTER_COMMENT);
+    }
+  }
+|  < "/*" > { numInnerComments++; }
+|  <  ~[] >
+}
+
+
+TOKEN : /* Reserved Words */
+{
+  < CLASS : "class" >
+|  < DO : "do" > 
+|  < IF : "if" >
+|  < ELSE : "else" >
+|  < FALSE : "false" >
+|  < FOR : "for" >
+|  < RETURN: "return">
+|  < TRUE : "true" >
+|  < WHILE : "while" >
+|  < NEW : "new" >
+}
+TOKEN : /* OPERATORS */{
+/* Arithmetic operators*/  < PLUS : "+" >|  < MINUS : "-" >|  < MULTIPLY : "*" >|  < DIVIDE : "/" >
+
+/* Increment operators*/
+|  < INCREMENT : "++" >
+|  < DECREMENT : "--" >
+
+/* Brackets, braces and parenthesis */
+|  < LEFT_BRACKET : "[" >
+|  < RIGHT_BRACKET : "]" >
+|  < LEFT_BRACE : "{" >
+|  < RIGHT_BRACE : "}" >
+|  < LEFT_PARENTHESIS : "(" >
+|  < RIGHT_PARENTHESIS : ")" >
+
+/* Access operator */
+|  < DOT : "." >
+
+/* Statement operators */
+|  < COMMA : "," >
+|  < SEMICOLON : ";" >
+
+/* Equality operators */
+|  < EQUAL : "==" >
+|  < NOT_EQUAL : "!=" >
+
+/* Comparison operators */
+|  < LESS_THAN : "<" >
+|  < GREATER_THAN : ">" >
+|  < LESS_THAN_OR_EQUAL : "<=" >
+|  < GREATER_THAN_OR_EQUAL : ">=" >
+
+/* Assignment operators */
+|  < GETS : "=" >
+
+/* Logical operators */
+|  < AND : "&&" >
+|  < OR : "||" >
+|  < NOT : "!" >
+
+/* Identifiers */
+|  < INTEGER_LITERAL : (["0"-"9"])+ >
+|  < IDENTIFIER: ["A"-"Z", "a"-"z", "_"](["A"-"Z", "a"-"z", "0"-"9", "_"])* >}
+/*
+
+Grammar
+
+program -> classDefinitions functionDefinitions
+
+classDefinitions -> (classDefinition)*
+
+classDefinition -> class identifier { variableDefinitions }
+
+variableDefinitions -> ( variableDefinition; )*
+
+variableDefinition -> identifier identifier ([])*
+
+functionDefinitions -> (identifier identifier ( formalParameterList ) functionDefinition)*
+
+functionDefinition ->  ; | { statementList }
+
+formalParameterList -> variableDefinition (, variableDefinition)*
+
+statementList -> (statement)*
+
+statement->  blockStatement | variableOrFunctionStatement | ifStatement |
+      doWhileStatement | whileStatement | forStatement | ; | returnStatement
+
+blockStatement-> { statementList }
+
+variableOrFunctionStatement-> complexLeftAccess (declarations | assignment | functionArguments) ;
+
+complexLeftAccess-> identifier (arrayAccess)* ( . identifier (arrayAccess)* )*)
+
+functionArguments-> "("  (arguments)? ")"
+
+declarations-> declaration (, declaration)*
+
+declaration-> identifier ([])* (= expression)?
+
+assignments-> assignment (, identifier assignment)*
+
+assignment-> (= expression | ++ | -- )
+
+doWhileStatements-> do statement while (expression);
+
+whileStatement-> while (expression) statement
+
+forStatement-> for ( forInitialization? ; (expression)? ; (identifier assignments)? ) statement
+
+forInitialization-> identifier (declarations | assignments ) 
+
+ifStatement-> if ( expression() ) statement() (else statement())?
+
+arguments-> expression (, expression)*
+
+returnStatement-> return (expression)? ;
+
+expression-> operatorExpression | newExpression
+
+operatorExpression-> logicalOrTerm logicalOrExpression
+
+logicalOrExpression-> (||) logicalOrTerm logicalOrExpression | EPSILON
+
+logicalOrTerm-> logicalAndTerm logicalAndExpression
+
+logicalAndExpression-> (&&) logicalAndTerm logicalAndExpression | EPSILON
+
+logicalAndTerm-> negativeExpression | comparativeTerm comparisonExpression
+
+negativeExpression-> (!)+ factor
+
+comparisonExpression-> (== | != | < | <= | > | >=) comparativeTerm | EPSILON
+
+comparativeTerm-> term arithmeticExpression
+
+arithmeticExpression-> (+ | -) term arithmeticExpression | EPSILON  
+
+term-> factor arithmeticFactor
+
+arithmeticFactor-> (* | /) factor arithmeticFactor | EPSILON
+
+factor-> (-)?  ( complexAccess | integer )  | true | false | (expression)
+
+complexAccess-> identifier (functionArguments | (arrayAccess)* ( . identifier (arrayAccess)* )*)
+
+arrayAccess-> "[" expression "]"
+
+identifier: [a-z][a-z0-9]*
+
+newExpression-> new identifier ( "(" ")" | [ expression ] ([])*
+
+*/
+void program():
+{}
+{
+  classDefinitions() functionDefinitions() <EOF> /* Make sure this is the end of the file. */
+}
+
+void classDefinitions():
+{}
+{    (classDefinition())*
+}
+
+void classDefinition():
+{}
+{  <CLASS> <IDENTIFIER> <LEFT_BRACE> variableDefinitions() <RIGHT_BRACE>
+}
+
+void variableDefinitions():
+{}
+{
+  (variableDefinition() <SEMICOLON>)*}
+
+void variableDefinition():
+{}
+{  <IDENTIFIER> <IDENTIFIER> (<LEFT_BRACKET> <RIGHT_BRACKET>)* 
+}
+
+void functionDefinitions():
+{}
+{
+  (<IDENTIFIER> <IDENTIFIER> <LEFT_PARENTHESIS> formalParameterList() <RIGHT_PARENTHESIS> functionDefinition())*
+}
+
+void functionDefinition():
+{}
+{  <SEMICOLON>
+| <LEFT_BRACE> statementList() <RIGHT_BRACE>
+}
+
+void formalParameterList():
+{}
+{
+  variableDefinition() (<COMMA> variableDefinition())*
+|  {}
+}
+
+void statementList():
+{}
+{
+  (statement())*
+}
+
+void statement():
+{}
+{
+  blockStatement()
+| variableOrFunctionStatement()
+| ifStatement()
+| doWhileStatement()
+| whileStatement()
+| forStatement()
+| returnStatement()
+| <SEMICOLON>}
+
+void blockStatement():
+{}
+{  <LEFT_BRACE> statementList() <RIGHT_BRACE>
+}
+
+void variableOrFunctionStatement():
+{}
+{
+  complexLeftAccess()
+             (
+               declarations()
+               | assignment()
+               | <LEFT_PARENTHESIS> ( arguments() )? <RIGHT_PARENTHESIS>
+             ) <SEMICOLON>
+}
+
+void complexLeftAccess():
+{}
+{  <IDENTIFIER> (arrayAccess())* (<DOT> <IDENTIFIER> (arrayAccess())*)*
+}
+
+void functionArguments():
+{}
+{  <LEFT_PARENTHESIS> ( arguments() )? <RIGHT_PARENTHESIS>
+}
+
+void declarations():
+{}
+{
+  declaration() ( <COMMA> declaration() )*}
+
+void declaration():
+{}
+{
+  <IDENTIFIER> ( <LEFT_BRACKET> <RIGHT_BRACKET> )* ( <GETS> expression() )?
+}
+
+void assignments():
+{}
+{
+  assignment() ( <COMMA> <IDENTIFIER> assignment() )*
+}
+
+void assignment():
+{}
+{  (<GETS> expression() | <INCREMENT> | <DECREMENT> )
+}
+
+void doWhileStatement():
+{}
+{
+  <DO> statement() <WHILE> <LEFT_PARENTHESIS> expression() <RIGHT_PARENTHESIS> <SEMICOLON>
+}
+
+void whileStatement():
+{}
+{
+  <WHILE> <LEFT_PARENTHESIS> expression() <RIGHT_PARENTHESIS> statement()
+}
+
+void forStatement():
+{}
+{  <FOR> <LEFT_PARENTHESIS>
+     ( forInitialization() )? <SEMICOLON>
+     ( expression() )? <SEMICOLON>
+     ( <IDENTIFIER> assignments() )? <RIGHT_PARENTHESIS> statement()
+}
+
+void ifStatement():
+{}
+{  <IF> <LEFT_PARENTHESIS> expression() <RIGHT_PARENTHESIS> statement() (LOOKAHEAD(1) <ELSE> statement() )?
+}
+
+void returnStatement():
+{}
+{
+  <RETURN> ( expression() )? <SEMICOLON>}
+
+void arguments():
+{}
+{
+  expression() (<COMMA> expression())*  }
+
+void forInitialization():
+{}
+{  <IDENTIFIER> ( declarations() | assignments() )
+}
+
+void expression():
+{}
+{
+  operatorExpression() |  newExpression()
+}
+
+void operatorExpression():
+{}
+{
+  logicalOrTerm() logicalOrExpression() }
+
+void logicalOrExpression():
+{}
+{
+  <OR> logicalOrTerm() logicalOrExpression()
+|  {}
+}
+
+void logicalOrTerm():
+{}
+{
+  logicalAndTerm() logicalAndExpression() 
+}
+
+void logicalAndExpression():
+{}
+{
+  <AND> logicalAndTerm() logicalAndExpression()
+|  {}
+}
+
+void logicalAndTerm():
+{}
+{
+  negativeExpression() | comparativeTerm() comparisonExpression()
+}
+
+void negativeExpression():
+{}
+{  ( <NOT> )+ factor()
+}
+void comparisonExpression():
+{}
+{
+  ( <EQUAL>
+    | <NOT_EQUAL>
+    | <LESS_THAN>
+    | <LESS_THAN_OR_EQUAL>
+    | <GREATER_THAN>
+    | <GREATER_THAN_OR_EQUAL>
+  ) comparativeTerm()
+|  {}
+}
+
+void comparativeTerm():
+{}
+{
+  term() arithmeticExpression()
+}
+
+void arithmeticExpression():
+{}
+{  ( <MINUS> | <PLUS> ) term() arithmeticExpression()
+| {}
+}
+
+void term():
+{}
+{
+  factor() arithmeticFactor()}
+
+void arithmeticFactor():
+{}
+{
+  ( <MULTIPLY> | <DIVIDE> ) factor() arithmeticFactor()
+| {}
+}
+
+void factor():
+{}
+{  (<MINUS>)? ( complexAccess() | <INTEGER_LITERAL>)
+|  <TRUE>
+|  <FALSE>
+|  <LEFT_PARENTHESIS> expression() <RIGHT_PARENTHESIS> 
+}
+
+void complexAccess():
+{}
+{
+  <IDENTIFIER> (functionArguments()
+               | (arrayAccess())* (<DOT> <IDENTIFIER> (arrayAccess())*)*)
+}
+
+void arrayAccess():
+{}
+{  <LEFT_BRACKET> expression() <RIGHT_BRACKET>
+}
+
+void newExpression():
+{}
+{  <NEW> <IDENTIFIER>
+        ( <LEFT_PARENTHESIS> <RIGHT_PARENTHESIS>
+        |  arrayAccess()  ( <LEFT_BRACKET> <RIGHT_BRACKET> )* )
+}

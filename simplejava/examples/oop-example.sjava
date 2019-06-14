@@ -1,0 +1,139 @@
+class Point
+{
+  int x;
+  int y;
+
+  void print();
+
+  Point(int x, int y) {
+    this.x = x;
+    this.y = y;
+// You can uncomment this if you want.    
+//    this.print();
+//    print();
+  }
+
+  void setX(int xVal) {
+	x = xVal;
+  }
+
+  int getX() {
+	return x;
+  }
+  
+  void setY(int y) {
+	this.y = y;
+  }
+
+  int getY() {
+    return this.y;
+  }
+
+  void foo() {
+    Print(this.x);
+    Print(this.getY());
+    Println();
+  }
+  
+  void print() {
+	 Print(this.x);
+	 Print(getY());
+	 Println();
+//	 foo();
+  }
+}
+
+class Circle {
+  Point center;
+  int radio;
+
+  Circle() {
+	  
+  }
+  
+  Point getCenter() {
+	return center;
+  }
+
+  void setCenter(Point center) {
+	this.center = center;
+  }
+
+  int getRadio() {
+    return radio;
+  }
+
+  void setRadio(int radio) {
+    this.radio = radio;
+  }
+}
+
+class Figure {
+  Circle circle;
+  
+  void setCircle(Circle circle) {
+    this.circle = circle;
+  }
+  
+  Circle getCircle() {
+    return circle;
+  }
+}
+
+void main() {
+  int x = 23;
+  int y = 46;
+  Point p1 = new Point(x, y);
+  p1.setX(x);
+  p1.setY(y);
+
+  Print(p1.x);
+  Print(p1.getY());
+
+  Println();
+  p1.print();
+
+  Circle c1 = new Circle();
+  c1.setCenter(p1);
+  Print(c1.getCenter().x);
+  Print(c1.getCenter().getY());
+
+  Println();
+
+  Figure f1 = new Figure();
+  f1.setCircle(c1);
+  Print(f1.getCircle().getCenter().x);
+  Print(f1.getCircle().getCenter().getY());
+
+  Println();
+
+  Print(f1.getCircle().getCenter().x);
+  Print(f1.getCircle().getCenter().getY());
+
+  Println();
+
+  int size = 5;
+  Figure figures[] = new Figure[size];
+
+  for (int i = 0; i < size; i++) {
+	  figures[i] = new Figure();
+	  figures[i].setCircle(new Circle());
+	  figures[i].getCircle().setCenter(new Point(i, i + 1));
+	  figures[i].getCircle().getCenter().print();
+	  Point tmpCenter = figures[i].getCircle().getCenter();
+	  tmpCenter.print();
+	  figures[i].getCircle().getCenter().setX(figures[i].getCircle().getCenter().getX() + 10);
+	  int valX = figures[i].getCircle().getCenter().getX();
+	  Print(valX);
+	  Print(figures[i].getCircle().getCenter().x);
+	  
+	  Println();
+	  Println();
+  }
+
+  for (int i = 0; i < size; i++) {
+    Figure figure = figures[i];
+    figure.getCircle().getCenter().foo();
+  }
+}
+

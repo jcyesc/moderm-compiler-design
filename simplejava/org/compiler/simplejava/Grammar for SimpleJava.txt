@@ -1,0 +1,154 @@
+Grammar for SimpleLogic:
+
+==================
+Terminal simbols
+==================
+
+for if while do else class true false return
+
+
+====================
+Questions
+====================
+
+
+How are we going to know the size of the array?
+How should we handle duplicate variables?
+
+How do we check if a function is returning a value or not?
+
+Can SimpleJava allow comparisons between ints and objects.
+
+Can a program be an empty file? how many classes or functions a program must have?
+Yes, a valid program can be an empty file
+
+
+In Java, you can first call a function and then declare it. How is that implemented?
+
+Can our function return arrays? No
+
+Does simpleJava allow constructors with parameters?
+
+Should simpleJava allow to initialize instance variables?
+
+Does simpleJava allow to initialize the arrays with expressions between the brackets?
+
+Should simpleJava support preincrement and posincrement (predecrement and posdecrement)
+
+In the initialization part of the for loop, how the variable declaration works?
+
+for (int a = 0, b =9; ; )
+
+why a function that returns a value can't be an statement?
+
+Can javacc print the grammar? 
+
+When the return statement is empty, what should we return?
+
+Default value for the <test> part in the for loop?
+
+Should we treat a++ like a = a + 1?
+
+====================
+Grammar definition
+====================
+
+Grammar
+
+program -> classDefinitions functionDefinitions
+
+classDefinitions -> (classDefinition)*
+
+-- Covers the instance variables, methods and constructors.
+classDefinition -> class identifier {
+         (
+         identifier (
+                     (
+                       identifier (  ([])*; 
+                       | 
+                       "(" formalParameterList ")" methodDefinition
+                     )
+                     |
+                     "(" formalParameterList ")" methodDefinition
+                    ) 
+          
+         )* 
+      }
+
+methodDefinition ->  ; | { statementList }
+
+variableDefinitions -> ( variableDefinition; )*
+
+variableDefinition -> identifier identifier ([])*
+
+functionDefinitions -> (identifier identifier ( formalParameterList ) functionDefinition)*
+
+functionDefinition ->  ; | { statementList }
+
+formalParameterList -> variableDefinition (, variableDefinition)*
+
+statementList -> (statement)*
+
+statement->  blockStatement | variableOrFunctionStatement | ifStatement |
+      doWhileStatement | whileStatement | forStatement | ; | returnStatement
+
+blockStatement-> { statementList }
+
+variableOrFunctionStatement-> identifier (declarations | leftVariable assignment |  "("  (arguments)? ")" ) ;
+
+leftVariable-> (arrayAccess)* ( . identifier (arrayAccess)* )*)
+
+doWhileStatements-> do statement while (expression);
+
+whileStatement-> while (expression) statement
+
+forStatement-> for ( forInitialization? ; (expression)? ; (identifier assignments)? ) statement
+
+forInitialization-> identifier (declarations | assignments ) 
+
+declarations-> declaration (, declaration)*
+
+declaration-> identifier ([])* (= expression)?
+
+assignments-> leftVariable assignment (, identifier leftVariable assignment)*
+
+assignment-> (= expression | ++ | -- )
+
+ifStatement-> if ( expression() ) statement() (else statement())?
+
+arguments-> expression (, expression)*
+
+returnStatement-> return (expression)? ;
+
+expression-> operatorExpression | newExpression
+
+operatorExpression-> logicalOrTerm ( || logicalOrTerm )*
+
+logicalOrTerm-> logicalAndTerm ( (&&) logicalAndTerm )*
+
+logicalAndTerm-> negativeExpression | comparativeTerm ((== | != | < | <= | > | >=) comparativeTerm)?
+
+negativeExpression-> (!)+ factor
+
+comparativeTerm-> term ( (+ | -) term )*
+
+term-> factor ( (* | /) factor )*
+
+factor-> (-)?  ( complexAccess | integer | "(" expression ")" )  | true | false | 
+
+complexAccess-> identifier ( 
+                              "("  (arguments)? ")" 
+                              |
+                              (arrayAccess)* ( . identifier (
+                                                              (arrayAccess)*  
+                                                              |  
+                                                              "("  (arguments)? ")" )
+                                                            )*
+                           )
+                                                                                   
+arrayAccess-> "[" expression "]"
+
+identifier: [a-z][a-z0-9]*
+
+newExpression-> new identifier ( "(" ")" | [ expression ] ([])*
+
